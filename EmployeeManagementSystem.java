@@ -26,9 +26,9 @@ class Employee {
         return id;
     }
 
-    // Salary calculation
+    
     private void calculateSalary() {
-        pf = basicSalary * 0.05; // 5% PF
+        pf = basicSalary * 0.05;
 
         if (leaveDays > 2) {
             int extraLeaves = leaveDays - 2;
