@@ -1,193 +1,173 @@
-import java.util.ArrayList;
-import java.util.Iterator;
+import java.sql.*;
 import java.util.Scanner;
-
-class Employee {
-
-    private int id;
-    private String name;
-    private String role;
-    private double basicSalary;
-    private double pf;
-    private int leaveDays;
-    private double leaveLoss;
-    private double totalSalary;
-
-    public Employee(int id, String name, String role, double basicSalary, int leaveDays) {
-        this.id = id;
-        this.name = name;
-        this.role = role;
-        this.basicSalary = basicSalary;
-        this.leaveDays = leaveDays;
-        calculateSalary();
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    
-    private void calculateSalary() {
-        pf = basicSalary * 0.05;
-
-        if (leaveDays > 2) {
-            int extraLeaves = leaveDays - 2;
-            leaveLoss = extraLeaves * 500;
-        } else {
-            leaveLoss = 0;
-        }
-
-        totalSalary = basicSalary - pf - leaveLoss;
-    }
-
-    public void updateSalary(double newSalary) {
-        this.basicSalary = newSalary;
-        calculateSalary();
-    }
-
-    public void updateLeave(int newLeave) {
-        this.leaveDays = newLeave;
-        calculateSalary();
-    }
-
-    public void display() {
-        System.out.println("---------------------------------------");
-        System.out.println("ID           : " + id);
-        System.out.println("Name         : " + name);
-        System.out.println("Role         : " + role);
-        System.out.println("Basic Salary : " + basicSalary);
-        System.out.println("PF (5%)      : " + pf);
-        System.out.println("Leave Days   : " + leaveDays);
-        System.out.println("Leave Loss   : " + leaveLoss);
-        System.out.println("Total Salary : " + totalSalary);
-        System.out.println("---------------------------------------");
-    }
-}
 
 public class EmployeeManagementSystem {
 
-    static ArrayList<Employee> employees = new ArrayList<>();
     static Scanner sc = new Scanner(System.in);
 
     public static void main(String[] args) {
-
         int choice;
 
         do {
-            System.out.println("\n===== EMPLOYEE MANAGEMENT SYSTEM =====");
+            System.out.println("\n===== EMPLOYEE MANAGEMENT SYSTEM (SQL MODE) =====");
             System.out.println("1. Add Employee");
             System.out.println("2. View All Employees");
             System.out.println("3. Search Employee by ID");
             System.out.println("4. Update Employee Salary");
-            System.out.println("5. Update Employee Leave");
-            System.out.println("6. Delete Employee");
-            System.out.println("7. Exit");
+            System.out.println("5. Delete Employee");
+            System.out.println("6. Exit");
             System.out.print("Enter your choice: ");
-
             choice = sc.nextInt();
+            sc.nextLine();
 
             switch (choice) {
                 case 1 -> addEmployee();
                 case 2 -> viewAll();
                 case 3 -> searchEmployee();
                 case 4 -> updateSalary();
-                case 5 -> updateLeave();
-                case 6 -> deleteEmployee();
-                case 7 -> System.out.println("Exiting... Thank you!");
+                case 5 -> deleteEmployee();
+                case 6 -> System.out.println("Exiting... Thank you!");
                 default -> System.out.println("Invalid choice!");
             }
 
-        } while (choice != 7);
+        } while (choice != 6);
     }
 
+    // 1. ADD EMPLOYEE TO SQL
     static void addEmployee() {
         System.out.print("Enter Employee ID: ");
-        int id = sc.nextInt();
-        sc.nextLine();
-
+        int id = sc.nextInt(); sc.nextLine();
         System.out.print("Enter Name: ");
         String name = sc.nextLine();
-
         System.out.print("Enter Role: ");
         String role = sc.nextLine();
-
         System.out.print("Enter Basic Salary: ");
         double salary = sc.nextDouble();
 
-        System.out.print("Enter Leave Days Taken: ");
-        int leaveDays = sc.nextInt();
+        double pf = salary * 0.05;
+        double totalSalary = salary - pf;
 
-        employees.add(new Employee(id, name, role, salary, leaveDays));
-        System.out.println("Employee Added Successfully!");
+        String sql = "INSERT INTO employees VALUES (?, ?, ?, ?, ?, ?)";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement pst = con.prepareStatement(sql)) {
+            
+            pst.setInt(1, id);
+            pst.setString(2, name);
+            pst.setString(3, role);
+            pst.setDouble(4, salary);
+            pst.setDouble(5, pf);
+            pst.setDouble(6, totalSalary);
+
+            pst.executeUpdate();
+            System.out.println("Employee Added Successfully to SQL Database!");
+
+        } catch (SQLException e) {
+            System.out.println("Database Error: " + e.getMessage());
+        }
     }
 
+    // 2. VIEW ALL FROM SQL
     static void viewAll() {
-        if (employees.isEmpty()) {
-            System.out.println("No employees available!");
-            return;
-        }
-        for (Employee e : employees) {
-            e.display();
+        String sql = "SELECT * FROM employees";
+
+        try (Connection con = DBConnection.getConnection();
+             Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+
+            boolean hasData = false;
+            while (rs.next()) {
+                hasData = true;
+                displayFormat(rs);
+            }
+            if (!hasData) System.out.println("No employees available in Database!");
+
+        } catch (SQLException e) {
+            System.out.println("Error fetching data: " + e.getMessage());
         }
     }
 
+    // 3. SEARCH BY ID
     static void searchEmployee() {
         System.out.print("Enter Employee ID: ");
         int id = sc.nextInt();
 
-        for (Employee e : employees) {
-            if (e.getId() == id) {
-                e.display();
-                return;
+        String sql = "SELECT * FROM employees WHERE id = ?";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement pst = con.prepareStatement(sql)) {
+            
+            pst.setInt(1, id);
+            ResultSet rs = pst.executeQuery();
+
+            if (rs.next()) {
+                displayFormat(rs);
+            } else {
+                System.out.println("Employee NOT found!");
             }
+        } catch (SQLException e) {
+            System.out.println("Error searching employee: " + e.getMessage());
         }
-        System.out.println("Employee NOT found!");
     }
 
+    // 4. UPDATE SALARY IN SQL
     static void updateSalary() {
-        System.out.print("Enter Employee ID: ");
+        System.out.print("Enter Employee ID to update salary: ");
         int id = sc.nextInt();
+        System.out.print("Enter New Basic Salary: ");
+        double newSalary = sc.nextDouble();
 
-        for (Employee e : employees) {
-            if (e.getId() == id) {
-                System.out.print("Enter New Basic Salary: ");
-                double newSalary = sc.nextDouble();
-                e.updateSalary(newSalary);
-                System.out.println("Salary Updated Successfully!");
-                return;
-            }
+        double pf = newSalary * 0.05;
+        double total = newSalary - pf;
+
+        String sql = "UPDATE employees SET basic_salary = ?, pf = ?, total_salary = ? WHERE id = ?";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement pst = con.prepareStatement(sql)) {
+            
+            pst.setDouble(1, newSalary);
+            pst.setDouble(2, pf);
+            pst.setDouble(3, total);
+            pst.setInt(4, id);
+
+            int rowsAffected = pst.executeUpdate();
+            if (rowsAffected > 0) System.out.println("Salary Updated in SQL!");
+            else System.out.println("Employee NOT found!");
+
+        } catch (SQLException e) {
+            System.out.println("Error updating salary: " + e.getMessage());
         }
-        System.out.println("Employee NOT found!");
     }
 
-    static void updateLeave() {
-        System.out.print("Enter Employee ID: ");
-        int id = sc.nextInt();
-
-        for (Employee e : employees) {
-            if (e.getId() == id) {
-                System.out.print("Enter New Leave Days: ");
-                int newLeave = sc.nextInt();
-                e.updateLeave(newLeave);
-                System.out.println("Leave Updated Successfully!");
-                return;
-            }
-        }
-        System.out.println("Employee NOT found!");
-    }
-
+    // 5. DELETE FROM SQL
     static void deleteEmployee() {
-        System.out.print("Enter Employee ID: ");
+        System.out.print("Enter Employee ID to delete: ");
         int id = sc.nextInt();
 
-        Iterator<Employee> it = employees.iterator();
-        while (it.hasNext()) {
-            if (it.next().getId() == id) {
-                it.remove();
-                System.out.println("Employee Deleted Successfully!");
-                return;
-            }
+        String sql = "DELETE FROM employees WHERE id = ?";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement pst = con.prepareStatement(sql)) {
+            
+            pst.setInt(1, id);
+            int rowsAffected = pst.executeUpdate();
+            if (rowsAffected > 0) System.out.println("Employee Deleted from SQL!");
+            else System.out.println("Employee NOT found!");
+
+        } catch (SQLException e) {
+            System.out.println("Error deleting employee: " + e.getMessage());
         }
-        System.out.println("Employee NOT found!");
+    }
+
+    // Helper method to show data
+    private static void displayFormat(ResultSet rs) throws SQLException {
+        System.out.println("---------------------------------------");
+        System.out.println("ID           : " + rs.getInt("id"));
+        System.out.println("Name         : " + rs.getString("name"));
+        System.out.println("Role         : " + rs.getString("role"));
+        System.out.println("Basic Salary : " + rs.getDouble("basic_salary"));
+        System.out.println("PF (5%)      : " + rs.getDouble("pf"));
+        System.out.println("Total Salary : " + rs.getDouble("total_salary"));
+        System.out.println("---------------------------------------");
     }
 }
